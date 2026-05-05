@@ -1,4 +1,4 @@
-# my-backend
+# My Backend Template
 
 Production-ready Express.js + TypeScript backend template with authentication, caching, validation, and API documentation built-in.
 
