@@ -13,9 +13,11 @@
     "check": "bun run lint && bun run format"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^4.0.66",
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7",
     "@scalar/express-api-reference": "^0.9.14",
+    "ai": "^7.0.99",
     "better-auth": "^1.6.9",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
