@@ -1,0 +1,8 @@
+FROM redis:7-alpine
+
+EXPOSE 6379
+
+# Persist data across container restarts
+VOLUME ["/data"]
+
+CMD ["redis-server", "--appendonly", "yes", "--bind", "0.0.0.0"]

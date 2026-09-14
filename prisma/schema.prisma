@@ -18,17 +18,17 @@ datasource db {
 // tokens live on Account, never on User.
 
 model User {
-  id            String    @id @default(cuid())
+  id            String         @id @default(cuid())
   name          String
-  email         String    @unique
-  emailVerified Boolean   @default(false)
+  email         String         @unique
+  emailVerified Boolean        @default(false)
   image         String?
   /// Legacy column from the pre-Better Auth scaffold. Better Auth stores
   /// password hashes on Account (providerId "credential"); kept nullable so
   /// existing rows are not lost.
   password      String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
   sessions      Session[]
   accounts      Account[]
   conversations Conversation[]
@@ -81,22 +81,53 @@ model Verification {
 }
 
 model Conversation {
-  id String @id @default(cuid())
-  userId String
-  user User @relation(fields: [userId] , references: [id] , onDelete: Cascade)
-  title String @default("New Chat")
+  id            String   @id @default(cuid())
+  userId        String
+  title         String   @default("New Chat")
+  model         String? // e.g. openai/gpt-4.1 — per-thread model override
+  systemPrompt  String?  @db.Text
+  isPinned      Boolean  @default(false)
+  isArchived    Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  lastMessageAt DateTime @default(now()) // denormalized for fast sidebar sorting
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   messages Message[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+
+  @@index([userId, lastMessageAt(sort: Desc)])
+  @@index([userId, isPinned, lastMessageAt(sort: Desc)])
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+  TOOL
+}
+
+enum MessageStatus {
+  PENDING // created before streaming finishes
+  COMPLETE
+  ERROR
 }
 
 model Message {
-  id             String       @id @default(cuid())
+  id             String        @id @default(cuid())
   conversationId String
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  role           String
-  content        String
-  createdAt      DateTime     @default(now())
+  role           MessageRole
+  status         MessageStatus @default(COMPLETE)
+  content        String        @db.Text // plain text for search, previews, and simple history
+  parts          Json? // AI SDK UIMessage parts (text, files, tool calls, tool results)
+  metadata       Json? // usage, finishReason, model, provider, etc.
+  parentId       String? // message branching (edit / regenerate)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
-  @@index([conversationId])
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  parent       Message?     @relation("MessageBranches", fields: [parentId], references: [id], onDelete: SetNull)
+  children     Message[]    @relation("MessageBranches")
+
+  // Load last N messages: orderBy createdAt desc, take N, reverse in app code
+  @@index([conversationId, createdAt(sort: Asc)])
 }
