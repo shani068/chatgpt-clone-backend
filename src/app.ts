@@ -7,7 +7,8 @@ import { registerRoutes } from "./routes";
 import { registerDocs } from "./config/swagger.config";
 import { toNodeHandler } from "better-auth/node";
 import { auth } from "./config/auth.config";
-import "./config/redis.config";
+// TODO: re-enable when Redis is needed (cache / distributed rate limits)
+// import "./config/redis.config";
 
 const app: Application = express();
 
