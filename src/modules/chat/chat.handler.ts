@@ -41,6 +41,34 @@ const generateAssistantMessageId = createIdGenerator({
   size: 16,
 });
 
+/** Unwraps retry wrappers so we can inspect the provider's HTTP status. */
+function rootError(error: unknown): unknown {
+  if (error && typeof error === "object" && "lastError" in error) {
+    return (error as { lastError: unknown }).lastError ?? error;
+  }
+  return error;
+}
+
+/** Maps provider failures to a client-safe message (never leaks keys or raw bodies). */
+function toClientErrorMessage(error: unknown): string {
+  const root = rootError(error);
+  const statusCode =
+    root && typeof root === "object" && "statusCode" in root
+      ? (root as { statusCode?: number }).statusCode
+      : undefined;
+
+  if (statusCode === 401 || statusCode === 403) {
+    return "The AI provider rejected the server's API key. Please contact the administrator.";
+  }
+  if (statusCode === 429) {
+    return "The AI provider is rate limiting or out of quota. Please try again later.";
+  }
+  if (statusCode !== undefined && statusCode >= 500) {
+    return "The AI provider is temporarily unavailable. Please try again.";
+  }
+  return "The assistant could not generate a response. Please try again.";
+}
+
 export const streamChat = asyncHandler(async (req: Request, res: Response) => {
   const { id: conversationId, message } = req.body as ChatRequestBody;
   const userId = req.user!.id;
@@ -89,16 +117,38 @@ export const streamChat = asyncHandler(async (req: Request, res: Response) => {
 
   // Prefer standalone helpers — result.pipeUIMessageStreamToResponse is deprecated in AI SDK 7.
   // Docs: https://ai-sdk.dev/docs/reference/ai-sdk-ui/pipe-ui-message-stream-to-response
+  // Provider errors (bad key, quota, outage) arrive as stream parts, not exceptions.
+  let streamFailed = false;
+
   const stream = toUIMessageStream({
     stream: result.stream,
     originalMessages: uiMessages,
     generateMessageId: generateAssistantMessageId,
+    onError: (error) => {
+      streamFailed = true;
+      const root = rootError(error);
+      logger.error("Chat model stream failed", {
+        conversationId,
+        model: conversation.model,
+        error: root instanceof Error ? root.message : String(root),
+        statusCode:
+          root && typeof root === "object" && "statusCode" in root
+            ? (root as { statusCode?: number }).statusCode
+            : undefined,
+      });
+      return toClientErrorMessage(error);
+    },
     onFinish: async ({ responseMessage }) => {
       try {
+        // Never persist an empty/failed assistant reply — keep only the user turn.
+        const hasReply = !streamFailed && responseMessage.parts.length > 0;
+
         // Persist after the model finishes so the client sees tokens first.
-        const toSave: UIMessage[] = alreadyExists
-          ? [responseMessage]
-          : [incomingMessage, responseMessage];
+        const toSave: UIMessage[] = [
+          ...(alreadyExists ? [] : [incomingMessage]),
+          ...(hasReply ? [responseMessage] : []),
+        ];
+        if (toSave.length === 0) return;
 
         await saveChatMessages(conversationId, toSave, {
           updateTitle: !alreadyExists,
