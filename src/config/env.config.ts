@@ -11,6 +11,7 @@ const envSchema = z.object({
   GOOGLE_CLIENT_ID: z.string().min(1, "GOOGLE_CLIENT_ID is required"),
   GOOGLE_CLIENT_SECRET: z.string().min(1, "GOOGLE_CLIENT_SECRET is required"),
   OPENAI_API_KEY: z.string().min(1, "OPENAI_API_KEY is required"),
+  QDRANT_URL: z.string().url().default("http://localhost:6333"),
   // Optional override; defaults to BETTER_AUTH_URL (Next.js origin).
   CORS_ORIGIN: z.string().url().optional(),
   // TODO: re-enable when Redis is needed
