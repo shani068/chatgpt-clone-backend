@@ -2,6 +2,8 @@ import type { Request, Response } from "express";
 import {
   convertToModelMessages,
   createIdGenerator,
+  isDataUIPart,
+  isTextUIPart,
   pipeUIMessageStreamToResponse,
   streamText,
   toUIMessageStream,
@@ -13,6 +15,7 @@ import { ApiError } from "../../utils/ApiError";
 import logger from "../../config/logger.config";
 import prisma from "../../config/database.config";
 import { getChatModel } from "../ai/model";
+import { RAG_SYSTEM_PROMPT, retrieveContext } from "../../rag/query";
 import { loadChatMessages, saveChatMessages } from "./chat.persistence";
 import type { ChatRequestBody } from "./chat.validator";
 
@@ -106,9 +109,27 @@ export const streamChat = asyncHandler(async (req: Request, res: Response) => {
 
   const modelMessages = await convertToModelMessages(uiMessages);
 
+  // PDFs attached anywhere in this conversation switch the reply to RAG over those documents.
+  const documentIds = uiMessages.flatMap((entry) =>
+    entry.parts
+      .filter(isDataUIPart)
+      .filter((part) => part.type === "data-document")
+      .map((part) => (part.data as { documentId: string }).documentId),
+  );
+
+  let system = conversation.systemPrompt?.trim() || DEFAULT_SYSTEM_PROMPT;
+  if (documentIds.length) {
+    const question = incomingMessage.parts
+      .filter(isTextUIPart)
+      .map((part) => part.text)
+      .join("");
+    const context = await retrieveContext(question, documentIds, userId);
+    system = RAG_SYSTEM_PROMPT.replace("{context}", context);
+  }
+
   const result = streamText({
     model: getChatModel(conversation.model),
-    system: conversation.systemPrompt?.trim() || DEFAULT_SYSTEM_PROMPT,
+    system,
     messages: modelMessages,
   });
 
