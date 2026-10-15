@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
+import { MulterError } from "multer";
 import { ApiError } from "../utils/ApiError";
 import logger from "@/config/logger.config";
 import { env } from "@/config/env.config";
@@ -23,6 +24,11 @@ export const errorHandler = (
   if (err.code === "P2025") {
     statusCode = 404;
     message = "Record not found";
+  }
+  // Upload limits (file too large, too many files) are client errors, not server faults.
+  if (err instanceof MulterError) {
+    statusCode = 400;
+    message = err.code === "LIMIT_FILE_SIZE" ? "File is too large" : err.message;
   }
 
   // ✅ Use Winston  — not console.error
