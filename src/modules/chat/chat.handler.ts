@@ -16,8 +16,9 @@ import logger from "../../config/logger.config";
 import prisma from "../../config/database.config";
 import { getChatModel } from "../ai/model";
 import { RAG_SYSTEM_PROMPT, retrieveContext } from "../../rag/query";
+import { loadOwnedImages } from "../images/image.service";
 import { loadChatMessages, saveChatMessages } from "./chat.persistence";
-import type { ChatRequestBody } from "./chat.validator";
+import { imageIdsOf, type ChatRequestBody, type ImagePartData } from "./chat.validator";
 
 const DEFAULT_SYSTEM_PROMPT = `You are ChatGPT, a professional AI assistant built to help people get accurate, useful answers.
 
@@ -107,7 +108,29 @@ export const streamChat = asyncHandler(async (req: Request, res: Response) => {
     ? previousMessages
     : [...previousMessages, incomingMessage];
 
-  const modelMessages = await convertToModelMessages(uiMessages);
+  // Images travel as `data-image` id references; bytes are loaded here, owner-scoped.
+  const images = await loadOwnedImages(
+    uiMessages.flatMap((entry) => imageIdsOf(entry.parts)),
+    userId,
+  );
+  if (imageIdsOf(incomingMessage.parts).some((imageId) => !images.has(imageId))) {
+    throw new ApiError(400, "One or more attached images could not be found");
+  }
+
+  const modelMessages = await convertToModelMessages(uiMessages, {
+    // Data parts are dropped by default; only images become model content.
+    convertDataPart: (part) => {
+      if (part.type !== "data-image") return undefined;
+      const image = images.get((part.data as ImagePartData).imageId);
+      if (!image) return undefined;
+      return {
+        type: "file",
+        mediaType: image.mimeType,
+        filename: image.name,
+        data: image.data,
+      };
+    },
+  });
 
   // PDFs attached anywhere in this conversation switch the reply to RAG over those documents.
   const documentIds = uiMessages.flatMap((entry) =>
@@ -117,12 +140,14 @@ export const streamChat = asyncHandler(async (req: Request, res: Response) => {
       .map((part) => (part.data as { documentId: string }).documentId),
   );
 
+  const question = incomingMessage.parts
+    .filter(isTextUIPart)
+    .map((part) => part.text)
+    .join("");
+
   let system = conversation.systemPrompt?.trim() || DEFAULT_SYSTEM_PROMPT;
-  if (documentIds.length) {
-    const question = incomingMessage.parts
-      .filter(isTextUIPart)
-      .map((part) => part.text)
-      .join("");
+  // An image-only message has no text to retrieve with.
+  if (documentIds.length && question.trim()) {
     const context = await retrieveContext(question, documentIds, userId);
     system = RAG_SYSTEM_PROMPT.replace("{context}", context);
   }

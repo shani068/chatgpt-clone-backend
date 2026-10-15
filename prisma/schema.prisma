@@ -32,6 +32,7 @@ model User {
   sessions      Session[]
   accounts      Account[]
   conversations Conversation[]
+  chatImages    ChatImage[]
 }
 
 model Session {
@@ -130,4 +131,21 @@ model Message {
 
   // Load last N messages: orderBy createdAt desc, take N, reverse in app code
   @@index([conversationId, createdAt(sort: Asc)])
+}
+
+/// Images attached to chat messages. Messages reference them by id through a
+/// `data-image` part, so message rows stay small and bytes are only read when
+/// the model needs them or the owner views them.
+model ChatImage {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  mimeType  String
+  size      Int
+  data      Bytes
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }

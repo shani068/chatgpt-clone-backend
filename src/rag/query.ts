@@ -10,6 +10,7 @@ export const RAG_SYSTEM_PROMPT = `You answer questions about the user's uploaded
 - Mention the relevant section, priority, or phase when it helps.
 - If nothing in the context relates to the question, say the document does not cover it.
 - Do not invent facts about the document.
+- If the user attached images, also use what you see in them; the context only covers the PDFs.
 
 Context:
 {context}`;
