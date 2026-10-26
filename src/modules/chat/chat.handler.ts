@@ -1,4 +1,3 @@
-import type { Request, Response } from "express";
 import {
   convertToModelMessages,
   createIdGenerator,
@@ -10,15 +9,19 @@ import {
   type UIMessage,
 } from "ai";
 
-import { asyncHandler } from "../../utils/asyncHandler";
-import { ApiError } from "../../utils/ApiError";
-import logger from "../../config/logger.config";
 import prisma from "../../config/database.config";
-import { getChatModel } from "../ai/model";
+import logger from "../../config/logger.config";
+import { requireUser } from "../../middleware/auth.middleware";
 import { RAG_SYSTEM_PROMPT, retrieveContext } from "../../rag/query";
+import { ApiError } from "../../utils/ApiError";
+import { asyncHandler } from "../../utils/asyncHandler";
+import { getChatModel } from "../ai/model";
 import { loadOwnedImages } from "../images/image.service";
+
 import { loadChatMessages, saveChatMessages } from "./chat.persistence";
 import { imageIdsOf, type ChatRequestBody, type ImagePartData } from "./chat.validator";
+
+import type { Request, Response } from "express";
 
 const DEFAULT_SYSTEM_PROMPT = `You are ChatGPT, a professional AI assistant built to help people get accurate, useful answers.
 
@@ -48,7 +51,7 @@ const generateAssistantMessageId = createIdGenerator({
 /** Unwraps retry wrappers so we can inspect the provider's HTTP status. */
 function rootError(error: unknown): unknown {
   if (error && typeof error === "object" && "lastError" in error) {
-    return (error as { lastError: unknown }).lastError ?? error;
+    return error.lastError ?? error;
   }
   return error;
 }
@@ -75,7 +78,7 @@ function toClientErrorMessage(error: unknown): string {
 
 export const streamChat = asyncHandler(async (req: Request, res: Response) => {
   const { id: conversationId, message } = req.body as ChatRequestBody;
-  const userId = req.user!.id;
+  const userId = requireUser(req).id;
 
   req.setTimeout(CHAT_TIMEOUT_MS);
   res.setTimeout(CHAT_TIMEOUT_MS);
@@ -100,18 +103,18 @@ export const streamChat = asyncHandler(async (req: Request, res: Response) => {
   }
 
   const previousMessages = await loadChatMessages(conversationId);
-  const alreadyExists = previousMessages.some((entry) => entry.id === message.id);
+  const isAlreadySaved = previousMessages.some((entry) => entry.id === message.id);
   const incomingMessage = message as UIMessage;
 
   // Keep history in memory only — do not block the stream on a DB write.
-  const uiMessages: UIMessage[] = alreadyExists
+  const uiMessages: UIMessage[] = isAlreadySaved
     ? previousMessages
     : [...previousMessages, incomingMessage];
 
   // Images travel as `data-image` id references; bytes are loaded here, owner-scoped.
   const images = await loadOwnedImages(
     uiMessages.flatMap((entry) => imageIdsOf(entry.parts)),
-    userId,
+    userId
   );
   if (imageIdsOf(incomingMessage.parts).some((imageId) => !images.has(imageId))) {
     throw new ApiError(400, "One or more attached images could not be found");
@@ -137,7 +140,7 @@ export const streamChat = asyncHandler(async (req: Request, res: Response) => {
     entry.parts
       .filter(isDataUIPart)
       .filter((part) => part.type === "data-document")
-      .map((part) => (part.data as { documentId: string }).documentId),
+      .map((part) => (part.data as { documentId: string }).documentId)
   );
 
   const question = incomingMessage.parts
@@ -164,14 +167,14 @@ export const streamChat = asyncHandler(async (req: Request, res: Response) => {
   // Prefer standalone helpers — result.pipeUIMessageStreamToResponse is deprecated in AI SDK 7.
   // Docs: https://ai-sdk.dev/docs/reference/ai-sdk-ui/pipe-ui-message-stream-to-response
   // Provider errors (bad key, quota, outage) arrive as stream parts, not exceptions.
-  let streamFailed = false;
+  let hasStreamFailed = false;
 
   const stream = toUIMessageStream({
     stream: result.stream,
     originalMessages: uiMessages,
     generateMessageId: generateAssistantMessageId,
     onError: (error) => {
-      streamFailed = true;
+      hasStreamFailed = true;
       const root = rootError(error);
       logger.error("Chat model stream failed", {
         conversationId,
@@ -187,17 +190,17 @@ export const streamChat = asyncHandler(async (req: Request, res: Response) => {
     onFinish: async ({ responseMessage }) => {
       try {
         // Never persist an empty/failed assistant reply — keep only the user turn.
-        const hasReply = !streamFailed && responseMessage.parts.length > 0;
+        const hasReply = !hasStreamFailed && responseMessage.parts.length > 0;
 
         // Persist after the model finishes so the client sees tokens first.
         const toSave: UIMessage[] = [
-          ...(alreadyExists ? [] : [incomingMessage]),
+          ...(isAlreadySaved ? [] : [incomingMessage]),
           ...(hasReply ? [responseMessage] : []),
         ];
         if (toSave.length === 0) return;
 
         await saveChatMessages(conversationId, toSave, {
-          updateTitle: !alreadyExists,
+          updateTitle: !isAlreadySaved,
         });
       } catch (error) {
         logger.error("Failed to persist chat messages after stream", {

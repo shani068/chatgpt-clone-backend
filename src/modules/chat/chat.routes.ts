@@ -1,8 +1,9 @@
 import { Router } from "express";
 
 import { protect } from "../../middleware/auth.middleware";
-import { validateChatBody } from "./chat.validator";
+
 import { streamChat } from "./chat.handler";
+import { validateChatBody } from "./chat.validator";
 
 const router = Router();
 

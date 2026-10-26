@@ -1,10 +1,12 @@
 import { z } from "zod";
-import type { Request, Response, NextFunction } from "express";
-import { ApiError } from "../../utils/ApiError";
+
 import { MessageRole, MessageStatus } from "../../generated/prisma/enums";
+import { ApiError } from "../../utils/ApiError";
+
+import type { Request, Response, NextFunction } from "express";
 
 const validate =
-  (schema: z.ZodSchema) =>
+  (schema: z.ZodType<unknown>) =>
   (req: Request, _res: Response, next: NextFunction): void => {
     const result = schema.safeParse(req.body);
     if (!result.success) {

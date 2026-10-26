@@ -1,4 +1,5 @@
 import winston from "winston";
+
 import "winston-daily-rotate-file";
 import { env } from "./env.config";
 
@@ -42,7 +43,7 @@ const devFormat = winston.format.combine(
   winston.format.printf(
     ({ timestamp, level, message, ...meta }) =>
       `${timestamp} [${level}]: ${message}${
-        Object.keys(meta).length ? "\n" + JSON.stringify(meta, null, 2) : ""
+        Object.keys(meta).length ? `\n${JSON.stringify(meta, null, 2)}` : ""
       }`
   )
 );

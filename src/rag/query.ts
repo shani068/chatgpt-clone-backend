@@ -3,6 +3,7 @@ import { ChatOpenAI } from "@langchain/openai";
 import { QdrantVectorStore } from "@langchain/qdrant";
 
 import { env } from "../config/env.config";
+
 import { COLLECTION_NAME, embeddings } from "./indexing";
 
 export const RAG_SYSTEM_PROMPT = `You answer questions about the user's uploaded PDF documents using the excerpts in the context below.

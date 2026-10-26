@@ -18,10 +18,16 @@ import noSecrets from "eslint-plugin-no-secrets";
 import prettier from "eslint-config-prettier";
 
 export default [
+  // ── Global ignores ───────────────────────────────────────────────────────
+  // Its own object with no `files` key, so it applies to every block.
+  // (ESLint 9+ no longer reads .eslintignore.)
+  {
+    ignores: ["node_modules/**", "dist/**", "coverage/**", "src/generated/**", "**/*.{js,mjs,cjs}"],
+  },
+
   // ── Files to lint ────────────────────────────────────────────────────────
   {
     files: ["src/**/*.ts"],
-    ignores: ["node_modules/**", "dist/**", "*.js", "*.mjs"],
 
     languageOptions: {
       parser: tsparser,
@@ -79,7 +85,8 @@ export default [
       "@typescript-eslint/no-unnecessary-type-assertion": "error",
 
       // Prefer nullish coalescing (??) over || for null/undefined checks
-      "@typescript-eslint/prefer-nullish-coalescing": "error",
+      // `x?.trim() || DEFAULT` deliberately treats "" as missing, so strings are exempt.
+      "@typescript-eslint/prefer-nullish-coalescing": ["error", { ignorePrimitives: { string: true } }],
 
       // Prefer optional chaining (?.) over && chains
       "@typescript-eslint/prefer-optional-chain": "error",
@@ -146,8 +153,29 @@ export default [
         {
           selector: "variable",
           types: ["boolean"],
-          format: ["camelCase"],
+          // The prefix is trimmed before the format check, so `isReady` is checked as `Ready`.
+          format: ["camelCase", "PascalCase"],
           prefix: ["is", "has", "should", "can", "did", "will", "are"],
+        },
+
+        // Names that come from a destructure are dictated by their source.
+        {
+          selector: "variable",
+          modifiers: ["destructured"],
+          format: null,
+        },
+
+        // Namespace imports (`* as UserService`) are PascalCase.
+        {
+          selector: "import",
+          format: ["camelCase", "PascalCase"],
+        },
+
+        // Keys that need quotes (HTTP headers like "Cache-Control") are not ours to rename.
+        {
+          selector: "objectLiteralProperty",
+          modifiers: ["requiresQuotes"],
+          format: null,
         },
 
         // Functions — camelCase only
@@ -358,7 +386,7 @@ export default [
       "prefer-template": "error",
 
       // No throw of non-Error objects — always throw new Error()
-      "@typescript-eslint/no-throw-literal": "error",
+      "@typescript-eslint/only-throw-error": "error",
 
       // Consistent error handling — use Error objects
       "no-throw-literal": "off", // replaced by @typescript-eslint version above

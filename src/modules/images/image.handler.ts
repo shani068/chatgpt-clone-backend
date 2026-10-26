@@ -1,10 +1,12 @@
-import type { Request, Response } from "express";
-
 import prisma from "../../config/database.config";
-import { asyncHandler } from "../../utils/asyncHandler";
+import { requireUser } from "../../middleware/auth.middleware";
 import { ApiError } from "../../utils/ApiError";
 import { ApiResponse } from "../../utils/ApiResponse";
+import { asyncHandler } from "../../utils/asyncHandler";
+
 import { detectImageType } from "./image.service";
+
+import type { Request, Response } from "express";
 
 const NAME_MAX_LENGTH = 200;
 
@@ -21,7 +23,7 @@ export const uploadImage = asyncHandler(async (req: Request, res: Response) => {
 
   const image = await prisma.chatImage.create({
     data: {
-      userId: req.user!.id,
+      userId: requireUser(req).id,
       name: (req.file.originalname || "image").slice(0, NAME_MAX_LENGTH),
       mimeType,
       size: data.byteLength,
@@ -30,19 +32,21 @@ export const uploadImage = asyncHandler(async (req: Request, res: Response) => {
     select: { id: true, mimeType: true, size: true },
   });
 
-  res.status(201).json(
-    new ApiResponse(
-      201,
-      { imageId: image.id, mediaType: image.mimeType, size: image.size },
-      "Image uploaded",
-    ),
-  );
+  res
+    .status(201)
+    .json(
+      new ApiResponse(
+        201,
+        { imageId: image.id, mediaType: image.mimeType, size: image.size },
+        "Image uploaded"
+      )
+    );
 });
 
 export const getImage = asyncHandler(async (req: Request, res: Response) => {
   // Scoped by owner: another user's id is indistinguishable from a missing one.
   const image = await prisma.chatImage.findFirst({
-    where: { id: req.params.id, userId: req.user!.id },
+    where: { id: req.params.id, userId: requireUser(req).id },
     select: { mimeType: true, data: true },
   });
 

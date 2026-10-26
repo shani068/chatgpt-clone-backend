@@ -1,6 +1,7 @@
 import { Router } from "express";
+
 import { protect } from "../../middleware/auth.middleware";
-import { validateCreate, validateUpdate } from "./message.validator";
+
 import {
   createMessage,
   listMessages,
@@ -8,6 +9,7 @@ import {
   updateMessage,
   deleteMessage,
 } from "./message.handler";
+import { validateCreate, validateUpdate } from "./message.validator";
 
 const router = Router();
 
