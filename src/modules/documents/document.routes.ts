@@ -3,6 +3,7 @@ import multer from "multer";
 
 import { protect } from "../../middleware/auth.middleware";
 import { ApiError } from "../../utils/ApiError";
+
 import { uploadDocument } from "./document.handler";
 
 const upload = multer({

@@ -3,6 +3,7 @@ import multer from "multer";
 
 import { protect } from "../../middleware/auth.middleware";
 import { ApiError } from "../../utils/ApiError";
+
 import { getImage, uploadImage } from "./image.handler";
 import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_BYTES } from "./image.service";
 

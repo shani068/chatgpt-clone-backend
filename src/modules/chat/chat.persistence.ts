@@ -1,8 +1,8 @@
-import type { UIMessage } from "ai";
-
 import prisma from "../../config/database.config";
-import { Prisma } from "../../generated/prisma/client";
+import { type Prisma } from "../../generated/prisma/client";
 import { MessageRole, MessageStatus } from "../../generated/prisma/enums";
+
+import type { UIMessage } from "ai";
 
 const DEFAULT_TITLE = "New Chat";
 const TITLE_MAX_LENGTH = 48;
@@ -78,9 +78,9 @@ export async function loadChatMessages(conversationId: string): Promise<UIMessag
 export async function saveChatMessages(
   conversationId: string,
   messages: UIMessage[],
-  options: SaveChatMessagesOptions = {},
+  options: SaveChatMessagesOptions = {}
 ): Promise<void> {
-  const { updateTitle = true } = options;
+  const { updateTitle: shouldUpdateTitle = true } = options;
   const now = new Date();
 
   await prisma.$transaction(async (tx) => {
@@ -118,7 +118,7 @@ export async function saveChatMessages(
     });
 
     let nextTitle: string | undefined;
-    if (updateTitle && conversation?.title === DEFAULT_TITLE) {
+    if (shouldUpdateTitle && conversation?.title === DEFAULT_TITLE) {
       const firstUser = messages.find((message) => message.role === "user");
       if (firstUser) {
         const text = textFromParts(firstUser.parts).replace(/\s+/g, " ").trim();

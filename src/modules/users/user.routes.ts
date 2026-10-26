@@ -1,6 +1,8 @@
 import { Router } from "express";
-import { getProfile, updateProfile } from "./user.handler";
+
 import { protect } from "../../middleware/auth.middleware";
+
+import { getProfile, updateProfile } from "./user.handler";
 
 const router = Router();
 

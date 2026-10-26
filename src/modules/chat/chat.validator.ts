@@ -1,7 +1,8 @@
 import { z } from "zod";
-import type { Request, Response, NextFunction } from "express";
 
 import { ApiError } from "../../utils/ApiError";
+
+import type { Request, Response, NextFunction } from "express";
 
 const MAX_IMAGES_PER_MESSAGE = 5;
 
@@ -35,8 +36,9 @@ const uiMessageSchema = z.object({
     .array(uiMessagePartSchema)
     .min(1, "message.parts must not be empty")
     .refine(
-      (parts) => parts.filter((part) => part.type === "data-image").length <= MAX_IMAGES_PER_MESSAGE,
-      `Up to ${MAX_IMAGES_PER_MESSAGE} images per message`,
+      (parts) =>
+        parts.filter((part) => part.type === "data-image").length <= MAX_IMAGES_PER_MESSAGE,
+      `Up to ${MAX_IMAGES_PER_MESSAGE} images per message`
     ),
   metadata: z.unknown().optional(),
 });

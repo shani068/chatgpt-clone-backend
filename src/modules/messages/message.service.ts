@@ -1,7 +1,8 @@
 import prisma from "../../config/database.config";
-import { ApiError } from "../../utils/ApiError";
-import type { MessageRole, MessageStatus } from "../../generated/prisma/enums";
 import { Prisma } from "../../generated/prisma/client";
+import { ApiError } from "../../utils/ApiError";
+
+import type { MessageRole, MessageStatus } from "../../generated/prisma/enums";
 
 interface CreateMessageInput {
   conversationId: string;

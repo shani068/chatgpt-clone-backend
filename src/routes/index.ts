@@ -1,11 +1,12 @@
-import type { Application } from "express";
 // import authRoutes from "../modules/auth/auth.routes";
-import userRoutes from "../modules/users/user.routes";
-import conversationRoutes from "../modules/conversation/conversation.routes";
-import messageRoutes from "../modules/messages/message.routes";
 import chatRoutes from "../modules/chat/chat.routes";
+import conversationRoutes from "../modules/conversation/conversation.routes";
 import documentRoutes from "../modules/documents/document.routes";
 import imageRoutes from "../modules/images/image.routes";
+import messageRoutes from "../modules/messages/message.routes";
+import userRoutes from "../modules/users/user.routes";
+
+import type { Application } from "express";
 
 export const registerRoutes = (app: Application): void => {
   // app.use("/api/v1/auth", authRoutes);

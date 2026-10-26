@@ -1,0 +1,4 @@
+src/generated/
+.agents/
+.claude/
+bun.lock

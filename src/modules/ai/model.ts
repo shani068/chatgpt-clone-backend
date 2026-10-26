@@ -1,7 +1,8 @@
 import { createOpenAI } from "@ai-sdk/openai";
-import type { LanguageModel } from "ai";
 
 import { env } from "../../config/env.config";
+
+import type { LanguageModel } from "ai";
 
 const DEFAULT_MODEL_ID = "gpt-4o-mini";
 

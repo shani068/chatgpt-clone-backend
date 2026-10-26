@@ -1,0 +1,19 @@
+name: CI
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      # prisma.config.ts requires it; `prisma generate` never connects.
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      # The Prisma client is git-ignored but imported by src/, so lint and tsc need it.
+      - run: bunx prisma generate
+      - run: bun run check
